@@ -41,8 +41,11 @@
 /* Private variables ---------------------------------------------------------*/
 GPIO_InitTypeDef* GPIO_;
 
-uint8_t send_arr [128];
-uint8_t rec_arr  [128];
+sdcard_typedef sdcard_0;
+
+uint8_t send_arr [1024];
+uint8_t rec_arr  [1024];
+uint32_t blockNum;
 /* Private function prototypes -----------------------------------------------*/
 
 static void NVIC_Configuration(void);
@@ -59,6 +62,7 @@ void SystemInit (void);
 int32_t main(void)
 {
     uint32_t delay;
+
     SystemCoreClockUpdate();
     /* NVIC configuration ------------------------------------------------------*/
     NVIC_Configuration();
@@ -67,9 +71,21 @@ int32_t main(void)
     spi2_init();
     set_sd_cs(GPIOB, SPI2_NSS, 1);
 
+    for(int i = 0 ; i < 512; i++)
+        send_arr[i] = i;
+
+
+    sdcard_0.SPI_X = SPI2;
+    sdcard_0.GPIO_X = GPIOB;
+    sdcard_0.GPIO_NSS = SPI2_NSS;
+    sdcard_0.state = 0;
+    sdcard_0.echc_sc = 0;
+
+    blockNum = 0;
+
     GPIOD->BSRRL = 0x1 << LED3;
 
-    if( sdcard_init(SPI2, GPIOB, SPI2_NSS) )
+    if( sdcard_init(&sdcard_0) )
     {
         GPIOD->BSRRL = 0x1 << LED3;
     }
@@ -87,6 +103,29 @@ int32_t main(void)
         GPIOD->ODR |= 0x2000;
         for( delay = 0 ; delay < 8000000 ; delay++ ) ;
         GPIOD->ODR &= ~0x2000;
+        if( sdcard_0.state )
+        {
+            // if( sdcard_WriteSingleBlock(&sdcard_0, blockNum, send_arr) == 1 )
+            // {
+            //     GPIOD->BSRRL = 0x1 << LED0;
+            // }
+            // else
+            // {
+            //     GPIOD->BSRRH = 0x1 << LED0;
+            // }
+            if( sdcard_ReadSingleBlock(&sdcard_0, blockNum, rec_arr) == 1 )
+            {
+                GPIOD->BSRRL = 0x1 << LED0;
+            }
+            else
+            {
+                GPIOD->BSRRH = 0x1 << LED0;
+            }
+        }
+        if( sdcard_0.echc_sc )
+            blockNum++;
+        else
+            blockNum += 512;
     }
 }
 
